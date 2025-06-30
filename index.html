@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Script Runner</title>
+  <style>
+    body { font-family: sans-serif; padding: 1em; max-width: 600px; margin: auto; }
+    textarea { width: 100%; height: 150px; }
+    select, input[type="text"], button { width: 100%; margin-top: 10px; }
+    progress { width: 100%; height: 20px; }
+  </style>
+</head>
+<body>
+  <h2>Script Runner</h2>
+  <label for="programList">Saved Programs:</label>
+  <select id="programList"></select>
+  <button onclick="loadProgram()">Load</button>
+
+  <textarea id="script" placeholder="say: Hello\nwait: 2\nrepeat: 3"></textarea>
+  <input type="text" id="progName" placeholder="Program name to save as">
+  <button onclick="saveProgram()">Save</button>
+  <button onclick="runScript()">Run</button>
+
+  <progress id="progress" value="0" max="1"></progress>
+
+  <script>
+    const progList = document.getElementById('programList');
+    const scriptBox = document.getElementById('script');
+    const progressBar = document.getElementById('progress');
+
+    function saveProgram() {
+      const name = document.getElementById('progName').value.trim();
+      if (!name) return alert('Please enter a name');
+      localStorage.setItem("prog_" + name, scriptBox.value);
+      updateList();
+    }
+
+    function loadProgram() {
+      const name = progList.value;
+      scriptBox.value = localStorage.getItem("prog_" + name) || "";
+    }
+
+    function updateList() {
+      progList.innerHTML = "";
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k.startsWith("prog_")) {
+          const name = k.slice(5);
+          const opt = document.createElement("option");
+          opt.text = name;
+          progList.add(opt);
+        }
+      }
+    }
+
+    async function runScript() {
+      const lines = scriptBox.value.trim().split("\n");
+      let commands = [];
+      let repeat = 1;
+      for (let line of lines) {
+        line = line.trim();
+        if (line.startsWith("say:")) {
+          commands.push({ type: "say", text: line.slice(4).trim() });
+        } else if (line.startsWith("wait:")) {
+          commands.push({ type: "wait", seconds: parseFloat(line.slice(5).trim()) });
+        } else if (line.startsWith("repeat:")) {
+          repeat = parseInt(line.slice(7).trim()) || 1;
+        }
+      }
+
+      const fullCommands = Array.from({ length: repeat }, () => commands).flat();
+      for (let i = 0; i < fullCommands.length; i++) {
+        const cmd = fullCommands[i];
+        progressBar.value = i / fullCommands.length;
+        if (cmd.type === "say") {
+          const u = new SpeechSynthesisUtterance(cmd.text);
+          window.speechSynthesis.speak(u);
+          await new Promise(r => {
+            u.onend = r;
+          });
+        } else if (cmd.type === "wait") {
+          await new Promise(r => setTimeout(r, cmd.seconds * 1000));
+        }
+      }
+      progressBar.value = 1;
+    }
+
+    updateList();
+  </script>
+</body>
+</html>
