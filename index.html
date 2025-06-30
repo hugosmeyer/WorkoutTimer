@@ -73,7 +73,10 @@
         const cmd = fullCommands[i];
         progressBar.value = i / fullCommands.length;
         if (cmd.type === "say") {
+          #const u = new SpeechSynthesisUtterance(cmd.text);
           const u = new SpeechSynthesisUtterance(cmd.text);
+          u.lang = 'en-US';
+          u.voice = speechSynthesis.getVoices().find(v => v.lang === 'en-US');
           window.speechSynthesis.speak(u);
           await new Promise(r => {
             u.onend = r;
