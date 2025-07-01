@@ -67,37 +67,39 @@ Content-Type: text/html
     }
 
     function parseCommands(lines) {
-      const root = [];
-      const stack = [{ commands: root }];
+  const root = [];
+  const stack = [{ commands: root }];
 
-      for (let line of lines) {
-        if (line === "") continue;
-        const current = stack[stack.length - 1].commands;
+  for (let raw of lines) {
+    const line = raw.trim();
+    if (line === "") continue;
+    const current = stack[stack.length - 1].commands;
 
-        if (line.startsWith("loop:")) {
-          const newBlock = [];
-          const loopCmd = { type: "loop", commands: newBlock, repeat: 1 };
-          current.push(loopCmd);
-          stack.push({ commands: newBlock }); // push block container
-        } else if (line.startsWith("repeat:")) {
-          const repeat = parseInt(line.slice(7).trim()) || 1;
-          stack.pop(); // close current loop block
-          const parent = stack[stack.length - 1].commands;
-          const lastCmd = parent[parent.length - 1];
-          if (lastCmd && lastCmd.type === "loop") {
-            lastCmd.repeat = repeat;
-          } else {
-            console.error("repeat without matching loop");
-          }
-        } else if (line.startsWith("say:")) {
-          current.push({ type: "say", text: line.slice(4).trim() });
-        } else if (line.startsWith("wait:")) {
-          current.push({ type: "wait", seconds: parseFloat(line.slice(5).trim()) });
-        }
+    if (line.startsWith("loop:")) {
+      const newBlock = [];
+      const loopCmd = { type: "loop", commands: newBlock, repeat: 1 };
+      current.push(loopCmd);
+      stack.push({ commands: newBlock }); // open new loop block
+    } else if (line.startsWith("repeat:")) {
+      const repeat = parseInt(line.slice(7).trim()) || 1;
+      stack.pop(); // close block
+      const parent = stack[stack.length - 1].commands;
+      const lastCmd = parent[parent.length - 1];
+      if (lastCmd && lastCmd.type === "loop") {
+        lastCmd.repeat = repeat;
+      } else {
+        console.error("repeat without matching loop");
       }
-
-      return root;
+    } else if (line.startsWith("say:")) {
+      current.push({ type: "say", text: line.slice(4).trim() });
+    } else if (line.startsWith("wait:")) {
+      current.push({ type: "wait", seconds: parseFloat(line.slice(5).trim()) });
     }
+  }
+
+  return root;
+}
+
 
     function flattenCommands(tree) {
       const result = [];
