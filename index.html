@@ -34,6 +34,19 @@
       localStorage.setItem("prog_" + name, scriptBox.value);
       updateList();
     }
+  function getVoice(lang = 'en-US') {
+  const voices = speechSynthesis.getVoices();
+  if (voices.length) {
+    return voices.find(v => v.lang === lang) || null;
+  } else {
+    // Voice list not ready yet — wait for it
+    return new Promise(resolve => {
+      speechSynthesis.onvoiceschanged = () => {
+        resolve(speechSynthesis.getVoices().find(v => v.lang === lang));
+      };
+    });
+  }
+}
 
     function loadProgram() {
       const name = progList.value;
@@ -73,13 +86,12 @@
         const cmd = fullCommands[i];
         progressBar.value = i / fullCommands.length;
         if (cmd.type === "say") {
-          #const u = new SpeechSynthesisUtterance(cmd.text);
           const u = new SpeechSynthesisUtterance(cmd.text);
-          u.lang = 'en-US';
-          u.voice = speechSynthesis.getVoices().find(v => v.lang === 'en-US');
-          window.speechSynthesis.speak(u);
-          await new Promise(r => {
-            u.onend = r;
+  u.lang = 'en-US';
+  u.voice = await getVoice('en-US');
+  await new Promise(r => {
+    u.onend = r;
+    speechSynthesis.speak(u);
           });
         } else if (cmd.type === "wait") {
           await new Promise(r => setTimeout(r, cmd.seconds * 1000));
