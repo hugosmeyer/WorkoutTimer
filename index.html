@@ -58,7 +58,8 @@ Content-Type: text/html
     window.addEventListener('load', updateList);
 
     async function runScript() {
-      const lines = scriptBox.value.trim().split("\n").map(line => line.trim());
+      #const lines = scriptBox.value.trim().split("\n").map(line => line.trim());
+      const lines = scriptBox.value.split("\n");
       const commandTree = parseCommands(lines);
       const flatCommands = flattenCommands(commandTree);
       await executeCommands(flatCommands);
