@@ -7,29 +7,36 @@ async function runScript() {
 }
 
 function parseCommands(lines) {
-  const stack = [[]];
+  const root = [];
+  const stack = [{ commands: root }];
 
   for (let line of lines) {
     if (line === "") continue;
+    const current = stack[stack.length - 1].commands;
 
     if (line.startsWith("loop:")) {
       const newBlock = [];
-      stack[stack.length - 1].push({ type: "loop", commands: newBlock, repeat: 1 });
-      stack.push(newBlock);
+      const loopCmd = { type: "loop", commands: newBlock, repeat: 1 };
+      current.push(loopCmd);
+      stack.push(loopCmd);  // push the loop itself
     } else if (line.startsWith("repeat:")) {
-      const count = parseInt(line.slice(7).trim()) || 1;
-      const block = stack.pop();
-      const parent = stack[stack.length - 1];
-      const loopCmd = parent[parent.length - 1];
-      if (loopCmd && loopCmd.type === "loop") {
-        loopCmd.repeat = count;
+      const repeat = parseInt(line.slice(7).trim()) || 1;
+      const lastLoop = stack.pop();
+      if (lastLoop && lastLoop.type === "loop") {
+        lastLoop.repeat = repeat;
+      } else {
+        console.error("repeat without matching loop");
       }
     } else if (line.startsWith("say:")) {
-      stack[stack.length - 1].push({ type: "say", text: line.slice(4).trim() });
+      current.push({ type: "say", text: line.slice(4).trim() });
     } else if (line.startsWith("wait:")) {
-      stack[stack.length - 1].push({ type: "wait", seconds: parseFloat(line.slice(5).trim()) });
+      current.push({ type: "wait", seconds: parseFloat(line.slice(5).trim()) });
     }
   }
+
+  return root;
+}
+
 
   return stack[0];
 }
