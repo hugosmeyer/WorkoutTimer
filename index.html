@@ -1,79 +1,142 @@
-async function runScript() {
-  const lines = scriptBox.value.trim().split("\n").map(line => line.trim());
-  const commandTree = parseCommands(lines);
-  const flatCommands = flattenCommands(commandTree);
-  await executeCommands(flatCommands);
-  progressBar.value = 1;
-}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Script Runner</title>
+  <style>
+    body { font-family: sans-serif; padding: 1em; max-width: 600px; margin: auto; }
+    textarea { width: 100%; height: 150px; }
+    select, input[type="text"], button { width: 100%; margin-top: 10px; }
+    progress { width: 100%; height: 20px; }
+  </style>
+</head>
+<body>
+  <h2>Script Runner</h2>
+  <label for="programList">Saved Programs:</label>
+  <select id="programList"></select>
+  <button onclick="loadProgram()">Load</button>
 
-function parseCommands(lines) {
-  const root = [];
-  const stack = [{ commands: root }];
+  <textarea id="script" placeholder="say: Hello\nwait: 2\nloop:\n  say: Hi\nrepeat: 3"></textarea>
+  <input type="text" id="progName" placeholder="Program name to save as">
+  <button onclick="saveProgram()">Save</button>
+  <button onclick="runScript()">Run</button>
 
-  for (let line of lines) {
-    if (line === "") continue;
-    const current = stack[stack.length - 1].commands;
+  <progress id="progress" value="0" max="1"></progress>
 
-    if (line.startsWith("loop:")) {
-      const newBlock = [];
-      const loopCmd = { type: "loop", commands: newBlock, repeat: 1 };
-      current.push(loopCmd);
-      stack.push(loopCmd);  // push the loop itself
-    } else if (line.startsWith("repeat:")) {
-      const repeat = parseInt(line.slice(7).trim()) || 1;
-      const lastLoop = stack.pop();
-      if (lastLoop && lastLoop.type === "loop") {
-        lastLoop.repeat = repeat;
-      } else {
-        console.error("repeat without matching loop");
-      }
-    } else if (line.startsWith("say:")) {
-      current.push({ type: "say", text: line.slice(4).trim() });
-    } else if (line.startsWith("wait:")) {
-      current.push({ type: "wait", seconds: parseFloat(line.slice(5).trim()) });
+  <script>
+    const progList = document.getElementById('programList');
+    const scriptBox = document.getElementById('script');
+    const progressBar = document.getElementById('progress');
+
+    function saveProgram() {
+      const name = document.getElementById('progName').value.trim();
+      if (!name) return alert('Please enter a name');
+      localStorage.setItem("prog_" + name, scriptBox.value);
+      updateList();
     }
-  }
 
-  return root;
-}
+    function loadProgram() {
+      const name = progList.value;
+      scriptBox.value = localStorage.getItem("prog_" + name) || "";
+    }
 
-
-
-
-function flattenCommands(tree) {
-  const result = [];
-
-  function expand(commands) {
-    for (let cmd of commands) {
-      if (cmd.type === "loop") {
-        for (let i = 0; i < cmd.repeat; i++) {
-          expand(cmd.commands);
+    function updateList() {
+      progList.innerHTML = "";
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k.startsWith("prog_")) {
+          const name = k.slice(5);
+          const opt = document.createElement("option");
+          opt.text = name;
+          progList.add(opt);
         }
-      } else {
-        result.push(cmd);
       }
     }
-  }
 
-  expand(tree);
-  return result;
-}
+    window.addEventListener('load', updateList);
 
-async function executeCommands(commands) {
-  for (let i = 0; i < commands.length; i++) {
-    const cmd = commands[i];
-    progressBar.value = i / commands.length;
-
-    if (cmd.type === "say") {
-      const u = new SpeechSynthesisUtterance(cmd.text);
-      u.lang = 'en-US';
-      u.voice = speechSynthesis.getVoices().find(v => v.lang === 'en-US');
-      await new Promise(r => {
-        u.onend = r;
-        speechSynthesis.speak(u);
-      });
-    } else if (cmd.type === "wait") {
-      await new Promise(r => setTimeout(r, cmd.seconds * 1000));
+    async function runScript() {
+      const lines = scriptBox.value.trim().split("\n").map(line => line.trim());
+      const commandTree = parseCommands(lines);
+      const flatCommands = flattenCommands(commandTree);
+      await executeCommands(flatCommands);
+      progressBar.value = 1;
     }
-  }
-}
+
+    function parseCommands(lines) {
+      const root = [];
+      const stack = [{ commands: root }];
+
+      for (let line of lines) {
+        if (line === "") continue;
+        const current = stack[stack.length - 1].commands;
+
+        if (line.startsWith("loop:")) {
+          const newBlock = [];
+          const loopCmd = { type: "loop", commands: newBlock, repeat: 1 };
+          current.push(loopCmd);
+          stack.push({ commands: newBlock }); // push block container
+        } else if (line.startsWith("repeat:")) {
+          const repeat = parseInt(line.slice(7).trim()) || 1;
+          stack.pop(); // close current loop block
+          const parent = stack[stack.length - 1].commands;
+          const lastCmd = parent[parent.length - 1];
+          if (lastCmd && lastCmd.type === "loop") {
+            lastCmd.repeat = repeat;
+          } else {
+            console.error("repeat without matching loop");
+          }
+        } else if (line.startsWith("say:")) {
+          current.push({ type: "say", text: line.slice(4).trim() });
+        } else if (line.startsWith("wait:")) {
+          current.push({ type: "wait", seconds: parseFloat(line.slice(5).trim()) });
+        }
+      }
+
+      return root;
+    }
+
+    function flattenCommands(tree) {
+      const result = [];
+
+      function expand(commands) {
+        for (let cmd of commands) {
+          if (cmd.type === "loop") {
+            for (let i = 0; i < cmd.repeat; i++) {
+              expand(cmd.commands);
+            }
+          } else {
+            result.push(cmd);
+          }
+        }
+      }
+
+      expand(tree);
+      return result;
+    }
+
+    async function executeCommands(commands) {
+      for (let i = 0; i < commands.length; i++) {
+        const cmd = commands[i];
+        progressBar.value = i / commands.length;
+
+        if (cmd.type === "say") {
+          const u = new SpeechSynthesisUtterance(cmd.text);
+          u.lang = 'en-US';
+
+          const voices = speechSynthesis.getVoices();
+          const enVoice = voices.find(v => v.lang === 'en-US');
+          if (enVoice) u.voice = enVoice;
+
+          await new Promise(r => {
+            u.onend = r;
+            speechSynthesis.speak(u);
+          });
+        } else if (cmd.type === "wait") {
+          await new Promise(r => setTimeout(r, cmd.seconds * 1000));
+        }
+      }
+    }
+  </script>
+</body>
+</html>
