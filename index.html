@@ -113,6 +113,12 @@ Content-Type: text/html
           current.push({ type: "wait", seconds: parseFloat(line.slice(5).trim()) });
           continue;
         }
+
+        if (line.startsWith("listen:")) {
+          current.push({ type: "listen", word: line.slice(7).trim().toLowerCase() });
+          continue;
+        }
+        
       }
 
       return root;
@@ -156,7 +162,41 @@ Content-Type: text/html
           });
         } else if (cmd.type === "wait") {
           await new Promise(r => setTimeout(r, cmd.seconds * 1000));
-        }
+        } else if (cmd.type === "listen") {
+  await new Promise((resolve, reject) => {
+    if (!('webkitSpeechRecognition' in window)) {
+      alert("Speech recognition not supported.");
+      return resolve();
+    }
+
+    const recognition = new webkitSpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = function(event) {
+      const transcript = event.results[0][0].transcript.trim().toLowerCase();
+      console.log("Heard:", transcript);
+      if (transcript === cmd.word) {
+        const u = new SpeechSynthesisUtterance("Yes sir");
+        speechSynthesis.speak(u);
+        u.onend = resolve;
+      } else {
+        alert(`Heard "${transcript}", waiting for "${cmd.word}"...`);
+        resolve(); // proceed anyway to avoid blocking
+      }
+    };
+
+    recognition.onerror = function(event) {
+      console.error("Speech error", event);
+      alert("Speech recognition error");
+      resolve(); // fail open
+    };
+
+    recognition.start();
+  });
+}
+
       }
     }
 
